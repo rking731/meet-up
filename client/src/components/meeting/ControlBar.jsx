@@ -4,20 +4,32 @@ import toast from 'react-hot-toast'
 
 const ControlBar = ({roomId, audioEnabled, videoEnabled, onToggleAudio, onToggleVideo, onToggleChat, onToggleParticipants, isChatOpen, isParticipantsOpen, unreadCount, participantCount, isHost, onLeave, onEndMeeting}) => {
     const [copied, setCopied] = useState(false)
-    const copyMeetingId = ()=>{
-        navigator.clipboard.writeText(window.location.href)
-        setCopied(true)
-        toast.success("Meeting link copied!")
-        setTimeout(()=>setCopied(false), 2000)
+    const copyMeetingId = async ()=>{
+        const valueToCopy = roomId ? String(roomId) : "";
+
+        if (!valueToCopy) {
+            toast.error("No meeting ID available to copy.");
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(valueToCopy);
+            setCopied(true);
+            toast.success("Meeting ID copied!");
+            setTimeout(()=>setCopied(false), 2000)
+        } catch (error) {
+            console.error("Failed to copy meeting ID:", error);
+            toast.error("Unable to copy meeting ID");
+        }
     }
   return (
     <footer className='w-full bg-white/90 backdrop-blur-md border-t border-slate-200/80 px-6 py-4 flex items-center justify-between z-40 shadow-lg shadow-slate-200/50'>
-      {/* info & copy link */}
+      {/* info & copy meeting id */}
       <div className='hidden sm:flex items-center gap-3'>
         <span className='text-xs font-medium text-slate-600 font-mono tracking-wider'>Id: {roomId}</span>
         <button onClick={copyMeetingId} className='p-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900 flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-all'>
             {copied ? <CheckIcon className='w-3.5 h-3.5 text-emerald-600' /> : <CopyIcon className='w-3.5 h-3.5'/>}
-            <span>{copied ? "Copied" : "Copy Link"}</span>
+            <span>{copied ? "Copied" : "Copy ID"}</span>
         </button>
       </div>
       {/* center */}

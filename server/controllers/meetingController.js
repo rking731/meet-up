@@ -238,7 +238,7 @@ export const getSessionDetails = async (req, res)=>{
             }))
                 }
 
-            res.json({meetings: formattedmeetings})
+            res.json({ meeting: formattedmeetings })
 
      } catch (error) {
          console.error("get session details failed:", error);

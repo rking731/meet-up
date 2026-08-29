@@ -36,13 +36,14 @@ export const handleClerkWebhook = async (req, res) => {
                 const image = data.image_url || "";
 
                 await sql`
-                INSERT INTO users (id, name, email, image)
-                VALUES (${userId}, ${name}, ${primaryEmail}, ${image})
+                INSERT INTO users (id, name, email, image, plan)
+                VALUES (${userId}, ${name}, ${primaryEmail}, ${image}, 'free')
                 ON CONFLICT (id) DO UPDATE SET 
                 id = EXCLUDED.id,
-                email = EXCLUDED.email,
+                email = COALESCE(NULLIF(EXCLUDED.email, ''), users.email),
                 name = EXCLUDED.name,
                 image = EXCLUDED.image,
+                plan = COALESCE(users.plan, 'free'),
                 updated_at = NOW()`;
                 break;
             }

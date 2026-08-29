@@ -137,16 +137,24 @@ export function setupSocketIO(io){
         try {
            const meetings = await sql`SELECT id, status FROM meetings WHERE meeting_id = ${roomId}`;
 
-           if(meetings.length === 0 && meetings[0].status !== "ended"){
-            const meetingId = meetings[0].id;
-            const senderId = message.senderId || null;
-
-            await sql`INSERT INTO meeting_messages (meeting_id, sender_id, sender_name, text, timestamp) VALUES (${meetingId}, ${senderId}, ${message.senderName || "Anonymous"}, ${message.text}, NOW())`;
-            io.in(roomId).emit("recieve-message", {
-                ...message,
-                senderSocketId: socket.id,
-            })
+           if (meetings.length === 0) {
+             return;
            }
+
+           const meeting = meetings[0];
+
+           if (meeting.status === "ended") {
+             return;
+           }
+
+           const meetingId = meeting.id;
+           const senderId = message?.senderId || null;
+
+           await sql`INSERT INTO meeting_messages (meeting_id, sender_id, sender_name, text, timestamp) VALUES (${meetingId}, ${senderId}, ${message?.senderName || "Anonymous"}, ${message?.text || ""}, NOW())`;
+           io.in(roomId).emit("receive-message", {
+               ...message,
+               senderSocketId: socket.id,
+           });
         } catch (error) {
              console.error("Error saving chat messages in DB:", error);
         }
@@ -155,12 +163,29 @@ export function setupSocketIO(io){
     // endMeeting
     socket.on('end-meeting', async ({roomId})=>{
        try {
-        await sql`UPDATE meetings SET status = "ended" , ended_at = NOW() WHERE meeting_id = ${roomId}`;
+        const meetings = await sql`SELECT id FROM meetings WHERE meeting_id = ${roomId}`;
+        if (meetings.length === 0) return;
 
-        io.on(roomId).emit('meeting-ended', {
-            message: "The meeting has been ended by the host."
+        await sql`UPDATE meetings SET status = ${"ended"}, ended_at = NOW() WHERE meeting_id = ${roomId}`;
+
+        const roomParticipants = rooms.get(roomId);
+        const socketIds = roomParticipants ? Array.from(roomParticipants.keys()) : [];
+
+        socketIds.forEach((participantSocketId) => {
+          io.to(participantSocketId).emit('meeting-ended', {
+            message: 'The meeting has been ended by the host.'
+          });
         });
-        rooms.delete(roomId);
+
+        io.to(roomId).emit('meeting-ended', {
+          message: 'The meeting has been ended by the host.'
+        });
+
+        if (roomParticipants) {
+          rooms.delete(roomId);
+        }
+
+        socket.leave(roomId);
 
        } catch (error) {
          console.error("Error ending meeting:", error);
