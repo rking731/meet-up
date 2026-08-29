@@ -14,6 +14,7 @@ const Dashboard = () => {
   const [isCreating, setIsCreating] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [stats, setStats] = useState(null)
+  const [meetingTitle, setMeetingTitle] = useState(`${userName}'s Meeting`)
 
   const [joinId, setJoinId] = useState('')
 
@@ -43,9 +44,18 @@ const Dashboard = () => {
 
   const handleCreateMeeting = async () => {
     if(!isLoaded || !isSignedIn) return;
+
+    const trimmedTitle = meetingTitle.trim();
+    if (!trimmedTitle) {
+      toast.error("Please enter a meeting title.");
+      return;
+    }
+
+    setIsCreating(true);
+
     try {
        const token = await getToken();
-       const res = await api.post("/api/meetings", {title: `${userName}'s Meeting`}, {
+       const res = await api.post("/api/meetings", {title: trimmedTitle}, {
           headers: {Authorization: `Bearer ${token}`},
        })
 
@@ -57,8 +67,6 @@ const Dashboard = () => {
     }finally{
       setIsCreating(false)
     }
-   
-
   }
 
   const handleJoinMeeting = async (e) => {
@@ -94,14 +102,23 @@ const Dashboard = () => {
               Experience crystal-clear video calls with our advanced encryption technology, ensuring your conversations remain private and secure.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
-               <button disabled={isCreating} className="bg-primary hover:bg-primary-hover text-white font-medium py-3.5 px-6 rounded-full shadow-md shadow-primary/20 flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
-                 onClick={handleCreateMeeting}
-               >
-                 <PlusIcon className="w-5 h-5" />
-                 <span>{isCreating ? "Creating Meeting..." : "New Meeting"}</span>
-               </button>
-               <form onSubmit={handleJoinMeeting} className="flex flex-1 items-center gap-2">
+            <div className="flex flex-col gap-4 pt-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="text"
+                  value={meetingTitle}
+                  onChange={(e) => setMeetingTitle(e.target.value)}
+                  placeholder="Enter meeting title"
+                  className="w-full sm:w-80 bg-white/75 rounded-full border border-primary-border/80 focus:border-primary/60 focus:ring-1 focus:ring-primary/60 px-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all"
+                />
+                <button disabled={isCreating} className="bg-primary hover:bg-primary-hover text-white font-medium py-3.5 px-6 rounded-full shadow-md shadow-primary/20 flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
+                  onClick={handleCreateMeeting}
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  <span>{isCreating ? "Creating Meeting..." : "New Meeting"}</span>
+                </button>
+              </div>
+              <form onSubmit={handleJoinMeeting} className="flex flex-1 items-center gap-2">
                  <div className="flex-1 relative">
                    <KeyboardIcon className="w-5 h-5 text-primary/90 absolute left-4 top-1/2 -translate-y-1/2" />
                    <input type="text" placeholder="Enter meeting code (e.g. abc-def-ghi)" value={joinId} onChange={(e) => setJoinId(e.target.value)} className="w-full bg-white/75 rounded-full border border-primary-border/80 focus:border-primary/60 focus:ring-1 focus:ring-primary/60 pl-12 pr-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all" />

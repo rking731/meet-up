@@ -4,6 +4,9 @@ import toast from 'react-hot-toast'
 
 const ControlBar = ({roomId, audioEnabled, videoEnabled, onToggleAudio, onToggleVideo, onToggleChat, onToggleParticipants, isChatOpen, isParticipantsOpen, unreadCount, participantCount, isHost, onLeave, onEndMeeting}) => {
     const [copied, setCopied] = useState(false)
+
+    const meetingLink = roomId ? `${window.location.origin}/meeting/${roomId}` : "";
+
     const copyMeetingId = async ()=>{
         const valueToCopy = roomId ? String(roomId) : "";
 
@@ -22,14 +25,46 @@ const ControlBar = ({roomId, audioEnabled, videoEnabled, onToggleAudio, onToggle
             toast.error("Unable to copy meeting ID");
         }
     }
+
+    const shareMeeting = async () => {
+        if (!meetingLink) {
+            toast.error("No meeting link available to share.");
+            return;
+        }
+
+        const shareText = `Join my meeting: ${meetingLink}`;
+
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'MeetUp meeting invite',
+                    text: shareText,
+                    url: meetingLink,
+                });
+                toast.success("Meeting link shared!");
+                return;
+            }
+
+            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+            window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+            toast.success("WhatsApp share window opened!");
+        } catch (error) {
+            console.error("Share failed:", error);
+            toast.error("Unable to share the meeting link");
+        }
+    }
+
   return (
     <footer className='w-full bg-white/90 backdrop-blur-md border-t border-slate-200/80 px-6 py-4 flex items-center justify-between z-40 shadow-lg shadow-slate-200/50'>
-      {/* info & copy meeting id */}
+      {/* info & share meeting */}
       <div className='hidden sm:flex items-center gap-3'>
         <span className='text-xs font-medium text-slate-600 font-mono tracking-wider'>Id: {roomId}</span>
         <button onClick={copyMeetingId} className='p-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900 flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-all'>
             {copied ? <CheckIcon className='w-3.5 h-3.5 text-emerald-600' /> : <CopyIcon className='w-3.5 h-3.5'/>}
             <span>{copied ? "Copied" : "Copy ID"}</span>
+        </button>
+        <button onClick={shareMeeting} className='p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 hover:text-emerald-900 flex items-center gap-1.5 text-xs font-medium cursor-pointer transition-all'>
+            <span>Share</span>
         </button>
       </div>
       {/* center */}

@@ -33,6 +33,7 @@ const io = new Server(server, {
     cors: {origin: allowedOrigins, credentials: true}
 })
 
+app.locals.io = io;
 setupSocketIO(io)
 
 // centralized error handler

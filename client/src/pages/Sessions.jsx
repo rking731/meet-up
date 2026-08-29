@@ -6,6 +6,7 @@ import SessionCard from '../components/sessions/SessionCard'
 import SessionDetailModal from '../components/sessions/SessionDetailModal'
 import { useAuth } from '@clerk/react'
 import api from '../config/api.js'
+import { socket } from '../config/socket.js'
 import toast from 'react-hot-toast'
 import Loader from '../components/Loader.jsx'
 
@@ -37,6 +38,26 @@ const Sessions = () => {
       fetchSessions();
   },[isLoaded, isSignedIn, getToken])
 
+  useEffect(()=>{
+    if (!isLoaded || !isSignedIn) return;
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleMeetingDeleted = ({ meetingId }) => {
+      setSessions((prev) => prev.filter((session) => session.meetingId !== meetingId));
+      setSelectedSession((prev) => (prev && prev.meetingId === meetingId ? null : prev));
+    };
+
+    socket.on('meeting-deleted', handleMeetingDeleted);
+
+    return () => {
+      socket.off('meeting-deleted', handleMeetingDeleted);
+      socket.disconnect();
+    };
+  }, [isLoaded, isSignedIn]);
+
   const openSessionDetails = async (sessionId)=> {
      try {
         const token = await getToken();
@@ -47,6 +68,22 @@ const Sessions = () => {
      } catch (_error) {
         toast.error("Could not fetch session details");
      }
+  }
+
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      const token = await getToken();
+      const res = await api.delete(`/api/meetings/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.data.success) {
+        setSessions((prev) => prev.filter((session) => session.meetingId !== sessionId));
+        toast.success("Session deleted successfully.");
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Could not delete session");
+    }
   }
 
   if(loading){
@@ -70,7 +107,7 @@ const Sessions = () => {
      ): (
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
         {sessions.map((session)=>(
-          <SessionCard key={session.id} session={session} onOpenDetails={openSessionDetails} onRejoin={(meetingId)=> navigate(`/meeting/${meetingId}`) }  />
+          <SessionCard key={session.id} session={session} onOpenDetails={openSessionDetails} onRejoin={(meetingId)=> navigate(`/meeting/${meetingId}`) } onDelete={handleDeleteSession} />
         ))}
       </div>
      )

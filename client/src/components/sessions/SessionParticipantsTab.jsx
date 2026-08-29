@@ -17,7 +17,8 @@ const SessionParticipantsTab = ({participants = [], host}) => {
   return (
     <div className='space-y-2.5'>
       {participants.map((p, idx)=>{
-        const participantUserId = p.user?.id || p.user;
+        const participantUserId = p.user?.id || p.userId || p.user_id || p.user;
+        const participantEmail = p.user?.email || p.email || p.userEmail || "";
         const isHost = Boolean(hostId && participantUserId && participantUserId.toString() === hostId.toString())
 
         return (
@@ -29,7 +30,7 @@ const SessionParticipantsTab = ({participants = [], host}) => {
                         {p.name}
                         {isHost && <CrownIcon className='w-3.5 h-3.5 text-amber-500' title="Host" />}
                     </span>
-                    {p.user?.email && <span className='text-xs text-slate-400 '>{p.user.email}</span>}
+                    {participantEmail && <span className='text-xs text-slate-400 '>{participantEmail}</span>}
                 </div>
               </div>
               <span className='text-xs text-slate-600 font-mono'>

@@ -110,6 +110,31 @@ export const getMeeting = async (req, res)=>{
 }
 
 //get all user's sessions
+export const deleteMeeting = async (req, res) => {
+    try {
+        const { meetingId } = req.params;
+        const userId = req.user.id;
+
+        const meetings = await sql`
+            SELECT id, host_id FROM meetings
+            WHERE meeting_id = ${meetingId} AND host_id = ${userId}
+        `;
+
+        if (meetings.length === 0) {
+            return res.status(404).json({ error: "Meeting not found or you are not the host." });
+        }
+
+        await sql`DELETE FROM meetings WHERE meeting_id = ${meetingId} AND host_id = ${userId}`;
+
+        req.app.locals.io?.emit('meeting-deleted', { meetingId });
+
+        res.json({ success: true, message: "Meeting deleted successfully." });
+    } catch (error) {
+        console.error("deleteMeeting failed:", error);
+        res.status(500).json({ error: "Failed to delete meeting" });
+    }
+}
+
 export const getUserSessions = async (req, res)=>{
      try {
         const userId = req.user.id;
@@ -151,7 +176,9 @@ export const getUserSessions = async (req, res)=>{
                 email: m.host_email,
             },
             participants: participants.map((p)=>({
-              user: p.user_id ? {id: p.user_id, email: p.email} : null,
+              user: p.user_id ? {id: p.user_id, email: p.email || null} : null,
+              userId: p.user_id || null,
+              email: p.email || null,
               name: p.name,
               joinedAt: p.joined_at,
               leftAt: p.left_at,
@@ -224,7 +251,9 @@ export const getSessionDetails = async (req, res)=>{
                 email: m.host_email,
             },
              participants: participants.map((p)=>({
-              user: p.user_id ? {id: p.user_id, email: p.email} : null,
+              user: p.user_id ? {id: p.user_id, email: p.email || null} : null,
+              userId: p.user_id || null,
+              email: p.email || null,
               name: p.name,
               joinedAt: p.joined_at,
               leftAt: p.left_at,

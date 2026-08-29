@@ -1,7 +1,7 @@
 import { CalendarIcon, MessageSquareIcon, UserIcon } from 'lucide-react'
 import React from 'react'
 
-const SessionCard = ({session, onOpenDetails, onRejoin}) => {
+const SessionCard = ({session, onOpenDetails, onRejoin, onDelete}) => {
     const isEnded = session.status === "ended"
   return (
     <div className='bg-white/70 backdrop-blur rounded-3xl p-6 transition-all flex flex-col justify-between space-y-5 border border-slate-100/60 shadow-xs'>
@@ -51,6 +51,11 @@ const SessionCard = ({session, onOpenDetails, onRejoin}) => {
         {!isEnded && (
             <button onClick={()=> onRejoin(session.meetingId)} className='w-full bg-primary hover:bg-primary-hover text-white font-medium py-2.5 px-4 rounded-full text-xs transition-all cursor-pointer text-center'>
                 Re-join
+            </button>
+        )}
+        {session.host?.id && (
+            <button onClick={()=> onDelete(session.meetingId)} className='w-full bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2.5 px-4 rounded-full text-xs transition-all cursor-pointer text-center'>
+                Delete
             </button>
         )}
       </div>
