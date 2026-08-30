@@ -10,91 +10,11 @@ const ICE_SERVERS = {
     ],
 };
 
-const getEnhancedAudioConstraints = () => ({
-    echoCancellation: { ideal: true },
-    noiseSuppression: { ideal: true },
-    autoGainControl: { ideal: true },
-    suppressLocalAudioPlayback: true,
-    channelCount: 1,
-    latency: { ideal: 0.02, max: 0.08 },
-    sampleRate: { ideal: 48000 },
-});
-
-const createVoiceFocusedStream = async (stream) => {
-    if (!stream || !stream.getAudioTracks().length) return stream;
-
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return stream;
-
-    try {
-        const audioContext = new AudioContextClass();
-        const source = audioContext.createMediaStreamSource(stream);
-
-        const highPassFilter = audioContext.createBiquadFilter();
-        highPassFilter.type = "highpass";
-        highPassFilter.frequency.value = 80;
-        highPassFilter.Q.value = 0.8;
-
-        const lowPassFilter = audioContext.createBiquadFilter();
-        lowPassFilter.type = "lowpass";
-        lowPassFilter.frequency.value = 4200;
-        lowPassFilter.Q.value = 0.8;
-
-        const compressor = audioContext.createDynamicsCompressor();
-        compressor.threshold.value = -28;
-        compressor.knee.value = 20;
-        compressor.ratio.value = 6;
-        compressor.attack.value = 0.02;
-        compressor.release.value = 0.2;
-
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = 1.1;
-
-        const destination = audioContext.createMediaStreamDestination();
-
-        source.connect(highPassFilter);
-        highPassFilter.connect(lowPassFilter);
-        lowPassFilter.connect(compressor);
-        compressor.connect(gainNode);
-        gainNode.connect(destination);
-
-        await audioContext.resume();
-
-        const processedAudioTracks = destination.stream.getAudioTracks();
-        if (!processedAudioTracks.length) {
-            await audioContext.close();
-            return stream;
-        }
-
-        stream.getAudioTracks().forEach((track) => track.stop());
-
-        const processedStream = new MediaStream([
-            ...stream.getVideoTracks(),
-            ...processedAudioTracks,
-        ]);
-
-        processedStream.getAudioTracks().forEach((track) => {
-            track.addEventListener("ended", async () => {
-                try {
-                    await audioContext.close();
-                } catch (error) {
-                    console.warn("Audio context cleanup warning:", error);
-                }
-            }, { once: true });
-        });
-
-        return processedStream;
-    } catch (error) {
-        console.warn("Voice processing unavailable; using browser default microphone cleanup:", error);
-        return stream;
-    }
-};
-
 export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
     const [localStream, setLocalStream] = useState(null);
     const [remoteUsers, setRemoteUsers] = useState([]); // Array of { socketId, userId, userName, stream, audioEnabled, videoEnabled }
-    const [audioEnabled, setAudioEnabled] = useState(false);
-    const [videoEnabled, setVideoEnabled] = useState(false);
+    const [audioEnabled, setAudioEnabled] = useState(true);
+    const [videoEnabled, setVideoEnabled] = useState(true);
 
     const peersRef = useRef(new Map()); // socketId -> RTCPeerConnection
     const localStreamRef = useRef(null);
@@ -103,48 +23,22 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
     const initLocalStream = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: "user",
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 24 },
-                },
-                audio: getEnhancedAudioConstraints(),
+                video: true,
+                audio: true,
             });
-
-            const processedStream = await createVoiceFocusedStream(stream);
-            const audioTrack = processedStream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = true;
-                audioTrack.applyConstraints(getEnhancedAudioConstraints()).catch(() => {});
-            }
-
-            localStreamRef.current = processedStream;
-            setLocalStream(processedStream);
-            setAudioEnabled(Boolean(audioTrack?.enabled));
-            setVideoEnabled(processedStream.getVideoTracks().some((track) => track.enabled));
-            return processedStream;
+            localStreamRef.current = stream;
+            setLocalStream(stream);
+            return stream;
         } catch (error) {
             toast.error("Could not access camera/microphone");
             console.error("Media devices access error:", error);
             // Fallback: try audio only
             try {
-                const audioStream = await navigator.mediaDevices.getUserMedia({
-                    audio: getEnhancedAudioConstraints(),
-                });
-
-                const processedAudioStream = await createVoiceFocusedStream(audioStream);
-                const fallbackAudioTrack = processedAudioStream.getAudioTracks()[0];
-                if (fallbackAudioTrack) {
-                    fallbackAudioTrack.enabled = true;
-                    fallbackAudioTrack.applyConstraints(getEnhancedAudioConstraints()).catch(() => {});
-                }
-
-                localStreamRef.current = processedAudioStream;
-                setLocalStream(processedAudioStream);
-                setAudioEnabled(Boolean(fallbackAudioTrack?.enabled));
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                localStreamRef.current = audioStream;
+                setLocalStream(audioStream);
                 setVideoEnabled(false);
-                return processedAudioStream;
+                return audioStream;
             } catch (err) {
                 console.error("Audio-only fallback error:", err);
                 return null;
@@ -217,12 +111,6 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
         let isMounted = true;
 
         const startSession = async () => {
-            const mediaSessionKey = "meetup-media-session-active";
-            if (sessionStorage.getItem(mediaSessionKey)) {
-                toast("Another meeting tab is already using your microphone/camera. Close the other tab or use headphones to avoid echo.", { icon: "⚠️" });
-            }
-            sessionStorage.setItem(mediaSessionKey, "active");
-
             const stream = await initLocalStream();
 
             if (!isMounted) return;
@@ -235,8 +123,8 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
             socket.emit("join-room", {
                 roomId,
                 user,
-                audioEnabled: Boolean(stream?.getAudioTracks().some((track) => track.enabled)),
-                videoEnabled: Boolean(stream?.getVideoTracks().some((track) => track.enabled)),
+                audioEnabled: true,
+                videoEnabled: true,
             });
 
             // 1. Receive all existing users in room
@@ -343,7 +231,6 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
         // Cleanup on leave/unmount
         return () => {
             isMounted = false;
-            sessionStorage.removeItem("meetup-media-session-active");
 
             // Stop local tracks
             if (localStreamRef.current) {
