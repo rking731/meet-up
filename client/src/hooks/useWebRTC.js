@@ -61,12 +61,29 @@ const createVoiceFocusedStream = async (stream) => {
         await audioContext.resume();
 
         const processedAudioTracks = destination.stream.getAudioTracks();
-        if (!processedAudioTracks.length) return stream;
+        if (!processedAudioTracks.length) {
+            await audioContext.close();
+            return stream;
+        }
 
-        return new MediaStream([
+        stream.getAudioTracks().forEach((track) => track.stop());
+
+        const processedStream = new MediaStream([
             ...stream.getVideoTracks(),
             ...processedAudioTracks,
         ]);
+
+        processedStream.getAudioTracks().forEach((track) => {
+            track.addEventListener("ended", async () => {
+                try {
+                    await audioContext.close();
+                } catch (error) {
+                    console.warn("Audio context cleanup warning:", error);
+                }
+            }, { once: true });
+        });
+
+        return processedStream;
     } catch (error) {
         console.warn("Voice processing unavailable; using browser default microphone cleanup:", error);
         return stream;
