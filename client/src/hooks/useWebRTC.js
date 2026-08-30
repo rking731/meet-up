@@ -115,12 +115,14 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
             const processedStream = await createVoiceFocusedStream(stream);
             const audioTrack = processedStream.getAudioTracks()[0];
             if (audioTrack) {
-                audioTrack.enabled = false;
+                audioTrack.enabled = true;
                 audioTrack.applyConstraints(getEnhancedAudioConstraints()).catch(() => {});
             }
 
             localStreamRef.current = processedStream;
             setLocalStream(processedStream);
+            setAudioEnabled(Boolean(audioTrack?.enabled));
+            setVideoEnabled(processedStream.getVideoTracks().some((track) => track.enabled));
             return processedStream;
         } catch (error) {
             toast.error("Could not access camera/microphone");
@@ -134,12 +136,13 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
                 const processedAudioStream = await createVoiceFocusedStream(audioStream);
                 const fallbackAudioTrack = processedAudioStream.getAudioTracks()[0];
                 if (fallbackAudioTrack) {
-                    fallbackAudioTrack.enabled = false;
+                    fallbackAudioTrack.enabled = true;
                     fallbackAudioTrack.applyConstraints(getEnhancedAudioConstraints()).catch(() => {});
                 }
 
                 localStreamRef.current = processedAudioStream;
                 setLocalStream(processedAudioStream);
+                setAudioEnabled(Boolean(fallbackAudioTrack?.enabled));
                 setVideoEnabled(false);
                 return processedAudioStream;
             } catch (err) {
@@ -232,8 +235,8 @@ export const useWebRTC = (roomId, user, onMeetingEnded, enabled = true) => {
             socket.emit("join-room", {
                 roomId,
                 user,
-                audioEnabled: false,
-                videoEnabled: false,
+                audioEnabled: Boolean(stream?.getAudioTracks().some((track) => track.enabled)),
+                videoEnabled: Boolean(stream?.getVideoTracks().some((track) => track.enabled)),
             });
 
             // 1. Receive all existing users in room

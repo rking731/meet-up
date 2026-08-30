@@ -6,9 +6,15 @@ const VideoTile = ({stream, name, isLocal = false, audioEnabled=true, videoEnabl
     const videoRef = useRef(null)
 
     useEffect(()=>{
-      if(videoRef.current && stream){
-        videoRef.current.srcObject = stream;
-      }
+      const video = videoRef.current;
+      if(!video || !stream) return;
+
+      video.srcObject = stream;
+      video.play().catch((error) => {
+        if (error.name !== "NotAllowedError") {
+          console.warn("Unable to start video playback:", error);
+        }
+      });
     },[stream])
 
   return (
